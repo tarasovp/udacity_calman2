@@ -83,6 +83,8 @@ UKF::UKF() {
     
     NIS_radar_ = 0;
     NIS_lidar_ = 0;
+    
+    n_sig_ = 2 * n_aug_ +1;
 }
 
 UKF::~UKF() {}
@@ -207,18 +209,11 @@ void UKF::PredictMeanAndCovariance() {
     
     
     // set weights
-    double weight_0 = lambda_/(lambda_+n_aug_);
-    weights_(0) = weight_0;
-    for (int i=1; i<2*n_aug_+1; i++) {  //2n+1 weights
-        double weight = 0.5/(n_aug_+lambda_);
-        weights_(i) = weight;
-    }
+    weights_.fill(0.5 / (lambda_ + n_aug_));
+    weights_(0) = lambda_/(lambda_ + n_aug_);
     
     //predicted state mean
-    x_.fill(0.0);
-    for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //iterate over sigma points
-        x_ = x_+ weights_(i) * Xsig_pred_.col(i);
-    }
+    x_ = Xsig_pred_ * weights_;
     
     //predicted state covariance matrix
     P_.fill(0.0);
@@ -247,6 +242,13 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
          * Remember: you'll need to convert radar from polar to cartesian coordinates.
          */
         x_ << 0, 0, 0, 0, 0;
+        
+        P_ << 0.15,    0, 0, 0, 0,
+        0, 0.15, 0, 0, 0,
+        0,    0, 1, 0, 0,
+        0,    0, 0, 1, 0,
+        0,    0, 0, 0, 1;
+        
         // first measurement
         if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
             /**
@@ -258,9 +260,7 @@ void UKF::ProcessMeasurement(MeasurementPackage measurement_pack) {
             // Coordinates convertion from polar to cartesian
             float x = rho * cos(phi);
             float y = rho * sin(phi);
-            float vx = rho_dot * cos(phi);
-            float vy = rho_dot * sin(phi);
-            x_ << x, y, sqrt(vx*vx+vy*vy), 0, 0;
+            x_ << x, y, rho_dot, 0, 0;
         }
         else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
             // We don't know velocities from the first measurement of the LIDAR, so, we use zeros
